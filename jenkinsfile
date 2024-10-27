@@ -1,0 +1,47 @@
+pipeline{
+    
+    agent any
+    
+    environment {
+        SONAR_HOME = tool('sonar')
+    }
+    stages{
+        
+        stage("Cloning code from got"){
+            steps{
+               git url:"https://github.com/krishnaacharyaa/wanderlust.git", branch:"devops"
+               echo "code cloned...."
+            }
+        }
+         stage('SonarQube Analysis') {
+            steps {
+                echo 'Running SonarQube analysis...'
+                script {
+                    withSonarQubeEnv('sonar') {
+                        sh "$SONAR_HOME/bin/sonar-scanner -Dsonar.projectName=wonderlust -Dsonar.projectKey=wonderlust"
+                    }
+                }
+            }
+        }
+        stage("Sonar Quality Gates"){
+             steps{
+                
+                timeout(time: 2, unit: "MINUTES"){
+                    waitForQualityGate abortPipeline: false
+                }
+            }
+        }
+        stage("Trivy file system scan"){
+             steps{
+                
+                sh "trivy fs --format table -o trivy-fs-report.html ."
+            }
+        }
+        stage("Deploy using docker compose"){
+             steps{
+                sh "docker-compose up -d"
+                echo "project deployment done....!!!"
+            }
+        }
+    }
+}
